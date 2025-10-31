@@ -30,6 +30,16 @@ CHINESE_SINGLE_ANSWER_TEMPLATE_COT = r"""回答下面的单项选择题，请选
 {choices}
 """.lstrip()
 
+CHINESE_SINGLE_ANSWER_TEMPLATE_WOCHOICE = r"""回答下面的单项选择题，请选出其中的正确答案。你的回答的最后一行应该是这样的格式："答案：LETTER"（不带引号），其中 LETTER 是选项首字母/序号，不需要选项内容。
+
+问题：{question}
+""".lstrip()
+
+CHINESE_SINGLE_ANSWER_TEMPLATE_WOCHOICE_COT = r"""回答下面的单项选择题，请选出其中的正确答案。你的回答的最后一行应该是这样的格式："答案：LETTER"（不带引号），其中 LETTER 是选项首字母/序号，不需要选项内容。请在回答前进行一步步思考。
+
+问题：{question}
+""".lstrip()
+
 SINGLE_ANSWER_TEMPLATE = r"""
 Answer the following multiple choice question. The entire content of your response should be of the following format: 'ANSWER: $LETTER' (without quotes) where LETTER is one of {letters}.
 
@@ -46,6 +56,18 @@ Answer the following multiple choice question. The last line of your response sh
 {choices}
 """.strip()
 
+SINGLE_ANSWER_TEMPLATE_WOCHOICE = r"""
+Answer the following multiple choice question. The entire content of your response should be of the following format: 'ANSWER: $LETTER' (without quotes) where LETTER is the first letter/number of the option, do not include the option content. 
+
+{question}
+""".strip()
+
+SINGLE_ANSWER_TEMPLATE_WOCHOICE_COT = r"""
+Answer the following multiple choice question. The last line of your response should be of the following format: 'ANSWER: $LETTER' (without quotes) where LETTER is the first letter/number of the option, do not include the option content. Think step by step before answering.
+
+{question}
+""".strip()
+
 MULTIPLE_ANSWER_TEMPLATE = r"""
 Answer the following multiple choice question where multiple answers may be correct. The entire content of your response should be of the following format: 'ANSWER: $LETTERS' (without quotes) where LETTERS is one or more of {letters}.
 
@@ -60,6 +82,18 @@ Answer the following multiple choice question where multiple answers may be corr
 {question}
 
 {choices}
+""".strip()
+
+MULTIPLE_ANSWER_TEMPLATE_WOCHOICE = r"""
+Answer the following multiple choice question where multiple answers may be correct. The entire content of your response should be of the following format: '$LETTERS' (without quotes) where LETTER is the first letter/number of the option, do not include the option content. 
+
+{question}
+""".strip()
+
+MULTIPLE_ANSWER_TEMPLATE_WOCHOICE_COT = r"""
+Answer the following multiple choice question where multiple answers may be correct. The last line of your response should be of the following format: 'ANSWER: $LETTERS' (without quotes) where LETTER is the first letter/number of the option, do not include the option content. Think step by step before answering.
+
+{question}
 """.strip()
 
 
@@ -119,22 +153,23 @@ def prompt(question: str, choices: Union[Choices, List[str]], template: str, few
 
 def format_example(
     question: str,
-    choices: Choices,
     answer: Target,
+    choices: Optional[Choices] = None,
 ) -> str:
     """Format a single example for few-shot learning.
 
     Args:
         question (str): The question text.
-        choices (list[str]): The list of choices.
+        choices (Optional[list[str]]): The list of choices, default None
         answer (list[str]): The correct answers.
 
     Returns:
         str: Formatted example string.
     """
-    choices_text = answer_options(choices)
-    return f'{question}\n{choices_text}\nANSWER: {answer.text}'
-
+    if choices:
+        choices_text = answer_options(choices)
+        return f'{question}\n{choices_text}\nANSWER: {answer.text}'
+    return f'{question}\nANSWER: {answer.text}'
 
 def _fallback_parse_answer(completion: str) -> Optional[set[str]]:
     # Fallback to find the last upper case letter
@@ -275,6 +310,20 @@ class MultipleChoiceTemplate:
     CHINESE_FEW_SHOT_TEMPLATE = CHINESE_FEW_SHOT_TEMPLATE
     CHINESE_SINGLE_ANSWER_TEMPLATE = CHINESE_SINGLE_ANSWER_TEMPLATE
     CHINESE_SINGLE_ANSWER_TEMPLATE_COT = CHINESE_SINGLE_ANSWER_TEMPLATE_COT
+
+
+class WOChoiceMultipleChoiceTemplate:
+    """
+    Templates for multiple choice questions.
+    """
+
+    SINGLE_ANSWER = SINGLE_ANSWER_TEMPLATE_WOCHOICE
+    SINGLE_ANSWER_COT = SINGLE_ANSWER_TEMPLATE_WOCHOICE_COT
+    MULTIPLE_ANSWER = MULTIPLE_ANSWER_TEMPLATE_WOCHOICE
+    MULTIPLE_ANSWER_COT = MULTIPLE_ANSWER_TEMPLATE_WOCHOICE_COT
+    CHINESE_FEW_SHOT_TEMPLATE = CHINESE_FEW_SHOT_TEMPLATE
+    CHINESE_SINGLE_ANSWER_TEMPLATE = CHINESE_SINGLE_ANSWER_TEMPLATE_WOCHOICE
+    CHINESE_SINGLE_ANSWER_TEMPLATE_COT = CHINESE_SINGLE_ANSWER_TEMPLATE_WOCHOICE_COT
 
 
 def answer_character(index: int) -> str:
