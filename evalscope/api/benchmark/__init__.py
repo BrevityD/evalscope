@@ -4,6 +4,7 @@ from .adapters import (
     ImageEditAdapter,
     MultiChoiceAdapter,
     NERAdapter,
+    WOChoiceMultiChoiceAdapter,
     Text2ImageAdapter,
     VisionLanguageAdapter,
 )
