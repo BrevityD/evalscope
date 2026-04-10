@@ -5,8 +5,10 @@ services:
     build: 
       context: .
       dockerfile: dockerfiles/Dockerfile_vllm
-    # image: deploy-vllm-service:latest
+    image: deploy-vllm-service:latest
     container_name: vllm-service
+    profiles:
+      - default
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
       - MODEL_NAME=${MODEL_NAME}
@@ -31,8 +33,10 @@ services:
     build:
       context: ~/evalscope
       dockerfile: deploy/dockerfiles/Dockerfile_eval
-    # image: deploy-eval-service:latest
+    image: deploy-eval-service:latest
     container_name: eval-service
+    profiles:
+      - default
     environment:
       - EVAL_MODEL_NAME=${MODEL_NAME}
       - EVAL_API_URL=${EVAL_API_URL}
@@ -46,6 +50,19 @@ services:
       - EVAL_DATASET_ARGS=${EVAL_DATASET_ARGS}
     volumes:
       - ./outputs:/app/outputs
+    networks:
+      - eval-network
+
+  eval-webui:
+    image: deploy-eval-service:latest
+    container_name: eval-webui
+    profiles:
+      - webui
+    volumes:
+      - ./outputs:/app/outputs
+    ports:
+      - "17860:7860"
+    command: ["evalscope", "app"]
     networks:
       - eval-network
 
