@@ -22,8 +22,6 @@ services:
       - VLLM_GPU_MEMORY_UTILIZATION=${VLLM_GPU_MEMORY_UTILIZATION}
     volumes:
       - /data/pretrained_models:/data/pretrained_models
-    ports:
-      - "${VLLM_PORT}:${VLLM_PORT}"
     networks:
       - eval-network
     devices:
