@@ -16,10 +16,11 @@ SLA (Service Level Agreement) 自动调优功能允许用户定义服务质量�
 | `--sla-auto-tune` | `bool` | 是否启用 SLA 自动调优模式 | `False` |
 | `--sla-variable` | `str` | 自动调优的变量<br>可选：`parallel`（并发数）、`rate`（请求速率） | `parallel` |
 | `--sla-params` | `str` | SLA 约束条件，JSON 字符串，支持多组约束（AND/OR 逻辑），详见[下方说明](#sla-params-逻辑说明) | `None` |
-| `--sla-upper-bound` | `int` | 自动调优时的最大并发数/速率限制 | `65536` |
-| `--sla-lower-bound` | `int` | 自动调优时的最小并发数/速率限制 | `1` |
+| `--sla-upper-bound` | `int` | 被调优变量的搜索上界 | `65536` |
+| `--sla-lower-bound` | `int` | 被调优变量的搜索下界 | `1` |
+| `--sla-fixed-parallel` | `int` | 在 `--sla-variable=rate` 时使用的固定并发数；未设置时默认回退到 `--sla-upper-bound` 以兼容旧行为 | `None` |
 | `--sla-num-runs` | `int` | 每个测试点的重复运行次数（取平均值，减少波动） | `3` |
-| `--sla-number-multiplier` | `float` | 每次测试时请求总数相对于并发数/速率的倍数，即 `number = round(parallel × N)`；未设置时默认为 `2` | `None` |
+| `--sla-number-multiplier` | `float` | 每次测试时请求总数相对于被调优变量（并发数或速率）的倍数，即 `number = round(variable × N)`；未设置时默认为 `2` | `None` |
 
 ## 支持的指标与操作符
 
@@ -34,6 +35,7 @@ SLA (Service Level Agreement) 自动调优功能允许用户定义服务质量�
 | **吞吐类** | `rps` | 请求吞吐量 (Requests Per Second) | `>=`, `>`, `max` |
 | | `tps` | Token 吞吐量 (Tokens Per Second) | `>=`, `>`, `max` |
 
+(sla-params-逻辑说明)=
 ## `--sla-params` 逻辑说明
 
 `--sla-params` 接受一个 **JSON 数组**，数组中每个元素为一个**对象（组）**。逻辑规则如下：
@@ -95,6 +97,8 @@ SLA (Service Level Agreement) 自动调优功能允许用户定义服务质量�
 5. **报告输出**：测试结束后，输出调优过程摘要及最终结果。
 
 > **注意**：如果测试过程中请求成功率（Success Rate）低于 100%，该测试点将被视为失败（违反 SLA）。
+>
+> 当 `--sla-variable=rate` 时，可以通过 `--sla-fixed-parallel` 显式指定固定并发数；未设置时默认沿用 `--sla-upper-bound`，以兼容旧版本行为。
 
 ## 使用示例
 
@@ -223,6 +227,7 @@ evalscope perf \
  --sla-params '[{"p99_ttft": "<0.05"}, {"p99_ttft": "<0.01"}]' \
  --rate 2 \
  --sla-num-runs 1 \
+ --sla-fixed-parallel 40 \
  --sla-lower-bound 10 \
  --sla-upper-bound 40
 ```

@@ -1,7 +1,6 @@
 import os
 import pandas as pd
 import re
-from datetime import datetime
 from typing import Dict, List, Optional
 
 from evalscope.app.utils.visualization import (
@@ -12,9 +11,9 @@ from evalscope.app.utils.visualization import (
 from evalscope.constants import DEFAULT_LANGUAGE
 from evalscope.report.combinator import get_report_list
 from evalscope.report.report import Report, ReportKey
+from evalscope.utils.io_utils import current_time
 from evalscope.utils.logger import get_logger
 from evalscope.utils.resource_utils import load_benchmark_data
-from evalscope.version import __version__ as _evalscope_version
 
 logger = get_logger()
 
@@ -327,8 +326,7 @@ def gen_html_report_file(
     html_content = template.render(
         models=all_models,
         datasets=all_datasets,
-        generated_at=datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-        evalscope_version=_evalscope_version,
+        generated_at=current_time().strftime('%Y-%m-%d %H:%M:%S'),
         summary_rows=summary_rows,
         overview_chart_div=overview_chart_div,
         sunburst_chart_div=sunburst_chart_div,

@@ -2,9 +2,13 @@
 from dotenv import dotenv_values
 
 env = dotenv_values('.env')
+import tempfile
 import unittest
 
 from evalscope.perf.main import run_perf_benchmark
+from evalscope.perf.sla.sla_run import SLAAutoTuner
+from evalscope.perf.utils.benchmark_util import Metrics
+from evalscope.perf.utils.db_util import PercentileMetrics
 from tests.utils import test_level_list
 
 
@@ -106,7 +110,7 @@ class TestPerf(unittest.TestCase):
         from evalscope.perf.arguments import Arguments
         task_cfg = Arguments(
             parallel=20,
-            model='Qwen3-1.7B',
+            model='Qwen2.5-0.5B-Instruct',
             url='http://127.0.0.1:8801/v1/completions',
             api='openai',
             dataset='random',
@@ -118,6 +122,7 @@ class TestPerf(unittest.TestCase):
             number=20,
             tokenizer_path='Qwen/Qwen2.5-0.5B-Instruct',
             seed=None,
+            tokenize_prompt=True,
             extra_args={'ignore_eos': True}
         )
         metrics_result, percentile_result = run_perf_benchmark(task_cfg)
@@ -433,6 +438,72 @@ class TestPerf(unittest.TestCase):
             dataset_path='custom_eval/text/rerank/example.jsonl'
         )
         result = run_perf_benchmark(task_cfg)
+
+    def test_perf_share_gpt(self):
+        from evalscope.perf.arguments import Arguments
+        task_cfg = Arguments(
+            parallel=[1, 2],
+            number=[2, 4],
+            model='qwen-plus',
+            url='https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions',
+            api_key=env.get('DASHSCOPE_API_KEY'),
+            api='openai',
+            dataset='share_gpt_zh',
+        )
+        result = run_perf_benchmark(task_cfg)
+
+    def test_run_perf_multi_turn_random(self):
+        """Multi-turn benchmark with synthetic random conversations.
+
+        Each conversation has 2-4 user turns.  ``--number`` is the total turn
+        budget (= total API requests), ``--parallel`` is the concurrency.
+        Requires a running chat/completions endpoint and a local tokenizer.
+        """
+        from evalscope.perf.arguments import Arguments
+        task_cfg = Arguments(
+            parallel=[5, 10],
+            number=[10, 20],
+            model='Qwen2.5-0.5B-Instruct',
+            url='http://127.0.0.1:8801/v1/chat/completions',
+            api='openai',
+            dataset='random_multi_turn',
+            multi_turn=True,
+            min_turns=2,
+            max_turns=4,
+            min_prompt_length=64,
+            max_prompt_length=256,
+            max_tokens=128,
+            tokenizer_path='Qwen/Qwen2.5-0.5B-Instruct',
+            debug=True,
+        )
+        result = run_perf_benchmark(task_cfg)
+        print(result)
+
+    def test_run_perf_multi_turn_share_gpt(self):
+        """Multi-turn benchmark with ShareGPT Chinese conversations.
+
+        Uses the full user+assistant conversation from the dataset; assistant
+        turns are replaced by real model outputs during the benchmark.
+        Requires DASHSCOPE_API_KEY to be set in .env.
+        """
+        if not env.get('DASHSCOPE_API_KEY'):
+            self.skipTest('DASHSCOPE_API_KEY is not set.')
+            return
+
+        from evalscope.perf.arguments import Arguments
+        task_cfg = Arguments(
+            parallel=2,
+            number=5,
+            model='qwen-plus',
+            url='https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions',
+            api_key=env.get('DASHSCOPE_API_KEY'),
+            api='openai',
+            dataset='share_gpt_zh_multi_turn',
+            multi_turn=True,
+            max_turns=4,
+        )
+        result = run_perf_benchmark(task_cfg)
+        print(result)
 
 if __name__ == '__main__':
     unittest.main(buffer=False)

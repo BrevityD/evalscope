@@ -68,6 +68,9 @@ EvalScope 是由[魔搭社区](https://modelscope.cn/)打造的一款功能强�
 >
 > 版本 1.0 对评测框架进行了重大重构，在 `evalscope/api` 下建立了全新的、更模块化且易扩展的 API 层。主要改进包括：为基准、样本和结果引入了标准化数据模型；对基准和指标等组件采用注册表式设计；并重写了核心评测器以协同新架构。现有的基准已迁移到这一 API，实现更加简洁、一致且易于维护。
 
+- 🔥 **[2026.04.23]** 支持在评测任务中记录性能（perf）指标，可在单次评测运行中同时追踪模型准确率与 TTFT、TPOT、吞吐量等推理效率指标。
+- 🔥 **[2026.04.17]** 支持多轮对话性能压测，可对具备多轮上下文的对话模型服务进行负载测试，参考[使用文档](https://evalscope.readthedocs.io/zh-cn/latest/user_guides/stress_test/examples.html)。
+- 🔥 **[2026.04.10]** 新增支持 [TIR-Bench](https://arxiv.org/abs/2511.01833)（Thinking-with-Images Reasoning Benchmark），一个面向视觉语言模型的多模态推理基准，涵盖空间推理、OCR、拼图、迷宫等 13 个任务类别，共 1,215 个测试样本。
 - 🔥 **[2026.03.24]** 支持 Agent Skill，任何支持 Skill/Tool 调用的 Agent 模型均可通过自然语言直接驱动 EvalScope 完成模型评测、性能压测和结果可视化。安装 EvalScope Skill 后，直接用自然语言描述需求（如"评测 Qwen2.5-7B 在 gsm8k 上的表现"），Skill 会自动生成并执行对应的 `evalscope eval` / `evalscope perf` 命令，参考[使用文档](skills/evalscope/SKILL.md)。OpenClaw Skill 地址：[https://clawhub.ai/yunnglin/skill-evalscope](https://clawhub.ai/yunnglin/skill-evalscope)。
 - 🔥 **[2026.03.09]** 支持评测进度追踪和自动生成HTML格式可视化报告。
 - 🔥 **[2026.03.02]** 支持Anthropic Claude API评测，通过`--eval-type anthropic_api`指定使用Anthropic API服务进行评测。
@@ -144,9 +147,9 @@ EvalScope 是由[魔搭社区](https://modelscope.cn/)打造的一款功能强�
 
 欢迎加入我们的社区，与其他开发者交流并获取帮助。
 
-[Discord Group](https://discord.com/invite/D27yfEFVz5)              |  微信群 | 钉钉群
+[Discord Group](https://discord.gg/xc66bMxc4h)              |  微信群 | 钉钉群
 :-------------------------:|:-------------------------:|:-------------------------:
-<img src="docs/asset/discord_qr.jpg" width="160" height="160">  |  <img src="docs/asset/wechat.png" width="160" height="160"> | <img src="docs/asset/dingding.png" width="160" height="160">
+<img src="docs/asset/discord_qr.png" width="160" height="160">  |  <img src="docs/asset/wechat.png" width="160" height="160"> | <img src="docs/asset/dingding.png" width="160" height="160">
 
 
 

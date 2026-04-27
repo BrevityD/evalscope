@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Tuple, Union
 
 from evalscope.perf.arguments import Arguments
 from evalscope.perf.plugin.api.default_api import DefaultApiPlugin
+from evalscope.perf.plugin.datasets.utils import tokenize_chat_messages
 from evalscope.perf.plugin.registry import register_api
 from evalscope.utils.io_utils import base64_to_PIL
 from evalscope.utils.logger import get_logger
@@ -32,11 +33,13 @@ class OpenaiPlugin(DefaultApiPlugin):
         else:
             self.tokenizer = None
 
-    def build_request(self, messages: Union[List[Dict], str], param: Arguments = None) -> Dict:
+    def build_request(self, messages: Union[List[Dict], str, List[int]], param: Arguments = None) -> Dict:
         """Build the openai format request based on prompt, dataset
 
         Args:
-            message (List[Dict] | str): The basic message to generator query.
+            messages (List[Dict] | str | List[int]): The basic message to generator query.
+                When param.tokenize_prompt is True, this may also be a list of token IDs
+                (List[int]) produced by the random dataset plugin.
             param (QueryParameters): The query parameters.
 
         Raises:
@@ -47,6 +50,13 @@ class OpenaiPlugin(DefaultApiPlugin):
         """
         param = param or self.param
         try:
+            # --tokenize-prompt path: convert messages/text/token-IDs to a token-ID list
+            # and send as a /v1/completions request with `prompt=[int, ...]`.
+            if param.tokenize_prompt:
+                token_ids = self._messages_to_token_ids(messages, param)
+                query = {'prompt': token_ids}
+                return self.__compose_query_from_parameter(query, param)
+
             if param.query_template is not None:
                 if param.query_template.startswith('@'):
                     file_path = param.query_template[1:]
@@ -68,6 +78,37 @@ class OpenaiPlugin(DefaultApiPlugin):
         except Exception as e:
             logger.exception(e)
             return None
+
+    def _messages_to_token_ids(self, messages: Union[List[Dict], str, List[int]], param: Arguments) -> List[int]:
+        """Convert messages / plain text / existing token IDs to a flat token-ID list.
+
+        This is used by the --tokenize-prompt path to produce a token-ID list that
+        is sent directly as `prompt` in a /v1/completions request, bypassing any
+        server-side re-tokenization.
+
+        Args:
+            messages: Chat message dicts, a plain-text string, or an already-computed
+                      list of token IDs (e.g. from the random dataset plugin).
+            param: Current arguments (used to access apply_chat_template setting).
+
+        Returns:
+            List[int]: Flat list of token IDs ready to be sent as `prompt`.
+        """
+        if self.tokenizer is None:
+            raise ValueError('A tokenizer is required for --tokenize-prompt. '
+                             'Please specify --tokenizer-path.')
+        # Already token IDs (random dataset fast path)
+        if isinstance(messages, list) and messages and isinstance(messages[0], int):
+            return messages
+        # Chat messages -> apply chat template to obtain token IDs.
+        if isinstance(messages, list) and messages and isinstance(messages[0], dict):
+            return tokenize_chat_messages(self.tokenizer, messages)
+        # Plain-text string
+        if isinstance(messages, str):
+            return self.tokenizer.encode(messages, add_special_tokens=False)
+        # Fallback: empty list (should not happen in practice)
+        logger.warning(f'_messages_to_token_ids: unexpected messages type {type(messages)}, returning []')
+        return []
 
     def __compose_query_from_parameter(self, payload: Dict, param: Arguments):
         payload['model'] = param.model
@@ -201,10 +242,11 @@ class OpenaiPlugin(DefaultApiPlugin):
         This method handles different types of requests and calculates tokens for:
         - Text content in messages or prompts
         - Images in multimodal messages (converted to patch tokens)
+        - Token-ID lists sent directly via --tokenize-prompt
 
         Args:
             request_str (str): The request json str containing either 'messages' for chat
-                          completion or 'prompt' for text completion.
+                          completion or 'prompt' for text completion (or token-ID list).
 
         Returns:
             int: The total number of input tokens including text and image tokens.
@@ -212,9 +254,7 @@ class OpenaiPlugin(DefaultApiPlugin):
         input_tokens = 0
         request = json.loads(request_str)
         if 'messages' in request:
-            input_content = self.tokenizer.apply_chat_template(
-                request['messages'], tokenize=True, add_generation_prompt=True
-            )
+            input_content = tokenize_chat_messages(self.tokenizer, request['messages'])
             input_tokens += len(input_content)
             # handle image tokens if any
             for message in request['messages']:
@@ -238,7 +278,12 @@ class OpenaiPlugin(DefaultApiPlugin):
                             logger.warning(f'Failed to process image for token counting: {e}')
                             # Continue processing other content without failing
         elif 'prompt' in request:
-            input_tokens += len(self.tokenizer.encode(request['prompt'], add_special_tokens=False))
+            prompt = request['prompt']
+            # Fast path: token-ID list sent via --tokenize-prompt
+            if isinstance(prompt, list):
+                input_tokens += len(prompt)
+            else:
+                input_tokens += len(self.tokenizer.encode(prompt, add_special_tokens=False))
         return input_tokens
 
     def _count_output_tokens(self, response: str) -> int:

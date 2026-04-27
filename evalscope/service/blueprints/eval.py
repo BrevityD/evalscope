@@ -1,5 +1,6 @@
 import json
 import os
+import pandas as pd
 from flask import Blueprint, current_app, jsonify, request, send_file
 from tabulate import tabulate
 from typing import Any, Dict, List
@@ -45,14 +46,23 @@ def _build_result_table(work_dir: str) -> str:
         if not report_list:
             return ''
         df = get_data_frame(report_list, flatten_metrics=True, flatten_categories=True)
+        _CAT_LEVEL_NAMES = ['类别', '子类别', '细分类别']
         new_cols = {}
         for col in df.columns:
             if col in _COLUMN_ZH:
                 new_cols[col] = _COLUMN_ZH[col]
             elif col.startswith('Cat.'):
-                new_cols[col] = col.replace('Cat.', '类别')
+                try:
+                    level = int(col[4:])
+                    new_cols[col] = _CAT_LEVEL_NAMES[level] if level < len(_CAT_LEVEL_NAMES) else f'类别{level}'
+                except ValueError:
+                    new_cols[col] = col.replace('Cat.', '类别')
         df = df.rename(columns=new_cols)
-        return tabulate(df, headers=df.columns, tablefmt='pipe', showindex=False)
+        score_col = _COLUMN_ZH.get('Score', 'Score')
+        if score_col in df.columns:
+            df[score_col] = pd.to_numeric(df[score_col],
+                                          errors='coerce').map(lambda x: f'{x:.4f}' if pd.notna(x) else '')
+        return tabulate(df, headers=df.columns, tablefmt='pipe', showindex=False, disable_numparse=True)
     except Exception as e:
         logger.warning(f'Failed to build result table: {e}')
         return ''
@@ -114,12 +124,35 @@ def _build_task_config(data: dict) -> TaskConfig:
     return task_config
 
 
+def _all_results_empty(result) -> bool:
+    """Return True when every dataset in the evaluation result produced no scores.
+
+    This happens when ``ignore_errors=True`` and every sample failed: each
+    dataset evaluator returns an empty dict instead of a :class:`Report`.
+    """
+    if not result:
+        return True
+    if isinstance(result, dict):
+        return all(not v for v in result.values())
+    if isinstance(result, list):
+        return all(_all_results_empty(r) for r in result)
+    return False
+
+
 def _execute_task(task_id: str, task_config: TaskConfig, label: str = 'Task'):
     """Run the evaluation subprocess and return a Flask response."""
     create_log_file(task_id, os.path.join('logs', 'eval_log.log'))
     try:
         result = run_in_subprocess(run_eval_wrapper, task_config)
         table_str = _build_result_table(task_config.work_dir)
+        if _all_results_empty(result):
+            error_msg = (
+                'Evaluation completed but no results were produced. '
+                'All samples may have failed. '
+                'Check the evaluation log for details.'
+            )
+            logger.error(f'[{task_id}] {label} produced empty results: {error_msg}')
+            return jsonify({'status': 'error', 'task_id': task_id, 'error': error_msg}), 500
         logger.info(f'[{task_id}] {label} completed successfully')
         return jsonify({'status': 'completed', 'task_id': task_id, 'result': result, 'table': table_str})
     except Exception as e:
@@ -215,21 +248,26 @@ def get_evaluation_report():
 
 @bp_eval.route('/log', methods=['GET'])
 def get_evaluation_log():
-    """Get evaluation log content.
+    """Get evaluation log content with pagination.
 
     Query params:
         task_id    (str): the task identifier
-        start_line (int): skip this many leading lines (default 0)
-    """
-    try:
-        task_id = request.args.get('task_id')
-        start_line = request.args.get('start_line', 0, type=int)
+        start_line (int, optional): if not provided, read last `page` lines from end
+        page       (int): number of lines to read (default 500)
 
-        try:
-            content = get_log_content(task_id, os.path.join('logs', 'eval_log.log'), start_line)
-        except FileNotFoundError:
-            content = ''
-        return content, 200, {'Content-Type': 'text/plain; charset=utf-8'}
+    Returns:
+        dict with text, head_line, tail_line, total_lines
+    """
+    task_id = request.args.get('task_id')
+    if not task_id:
+        return jsonify({'error': 'task_id is required'}), 400
+
+    start_line = request.args.get('start_line', type=int)
+    page = request.args.get('page', 500, type=int)
+
+    try:
+        result = get_log_content(task_id, os.path.join('logs', 'eval_log.log'), start_line, page)
+        return jsonify(result), 200
     except Exception as e:
         logger.error(f'Failed to get evaluation log: {str(e)}')
         return jsonify({'error': str(e)}), 500

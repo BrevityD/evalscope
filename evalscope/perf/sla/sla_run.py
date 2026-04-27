@@ -52,22 +52,32 @@ def get_metric_values(results: Dict[str, Any]) -> Dict[str, float]:
         'tps': metrics.get(Metrics.OUTPUT_TOKEN_THROUGHPUT, 0),
     }
 
+    p50_idx = -1
+    p90_idx = -1
     p99_idx = -1
+
     if percentiles_data:
         try:
-            p99_idx = percentiles_data.get(PercentileMetrics.PERCENTILES, []).index('99%')
+            perc_list = percentiles_data.get(PercentileMetrics.PERCENTILES, [])
+            p50_idx = perc_list.index('50%')
+            p90_idx = perc_list.index('90%')
+            p99_idx = perc_list.index('99%')
         except ValueError:
             pass
 
-    def get_p99(key):
-        if p99_idx == -1:
+    def get_p(key, idx):
+        if idx == -1:
             return 0
         lst = percentiles_data.get(key, [])
-        return lst[p99_idx] if lst and len(lst) > p99_idx and isinstance(lst[p99_idx], (int, float)) else 0
+        return lst[idx] if lst and len(lst) > idx and isinstance(lst[idx], (int, float)) else 0
 
-    values['p99_latency'] = get_p99(PercentileMetrics.LATENCY)
-    values['p99_ttft'] = get_p99(PercentileMetrics.TTFT)
-    values['p99_tpot'] = get_p99(PercentileMetrics.TPOT)
+    values['p99_latency'] = get_p(PercentileMetrics.LATENCY, p99_idx)
+    values['p99_ttft'] = get_p(PercentileMetrics.TTFT, p99_idx)
+    values['p99_tpot'] = get_p(PercentileMetrics.TPOT, p99_idx)
+    values['p50_ttft'] = get_p(PercentileMetrics.TTFT, p50_idx)
+    values['p90_ttft'] = get_p(PercentileMetrics.TTFT, p90_idx)
+    values['p50_tpot'] = get_p(PercentileMetrics.TPOT, p50_idx)
+    values['p90_tpot'] = get_p(PercentileMetrics.TPOT, p90_idx)
 
     return values
 
@@ -125,6 +135,7 @@ class SLAAutoTuner:
         self.sla_results_table = []
         self.upper_bound = args.sla_upper_bound
         self.lower_bound = args.sla_lower_bound
+        self.fixed_parallel = args.sla_fixed_parallel if args.sla_fixed_parallel is not None else args.sla_upper_bound
 
     def tune(self) -> Dict[str, Any]:
         if not self.args.sla_params:
@@ -210,7 +221,7 @@ class SLAAutoTuner:
             elif self.sla_variable == 'rate':
                 run_args.rate = val
                 run_args.number = self._compute_number(val)
-                run_args.parallel = self.upper_bound
+                run_args.parallel = self.fixed_parallel
             else:
                 raise ValueError(f'Unsupported SLA variable: {self.sla_variable}')
 

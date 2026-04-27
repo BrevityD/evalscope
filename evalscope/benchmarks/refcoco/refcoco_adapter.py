@@ -74,15 +74,12 @@ RefCOCO is a dataset for training and evaluating models on Referring Expression 
         subset_list=['test', 'val', 'testA', 'testB'],
         extra_params={
             'eval_mode': {
-                'type':
-                'str',
-                'description':
-                'Control the evaluation mode used by RefCOCO. '
+                'type': 'str',
+                'description': 'Control the evaluation mode used by RefCOCO. '
                 'bbox: image caption task, visualize the original image with bounding box; '
                 'seg: image caption task, visualize the original image with segmentation; '
                 'bbox_rec: grounding task, recognize bounding box coordinates.',
-                'value':
-                EvalMode.BBOX,
+                'value': EvalMode.BBOX,
                 'choices': [EvalMode.BBOX, EvalMode.SEG, EvalMode.BBOX_REC]
             }
         }
@@ -95,7 +92,7 @@ class RefCOCOAdapter(DefaultDataAdapter):
         self.split_as_subset = True
         self.eval_mode = self.extra_params.get('eval_mode', EvalMode.BBOX)
 
-        check_import(module_name='pycocoevalcap', package='pycocoevalcap', raise_error=True)
+        check_import(module_name='pycocoevalcap', extra='refcoco', raise_error=True)
 
     def record_to_sample(self, record: Dict[str, Any]) -> Union[Sample, List[Sample]]:
         from PIL import Image

@@ -9,6 +9,7 @@ from evalscope.api.evaluator import TaskState
 from evalscope.api.metric import Score
 from evalscope.api.registry import register_benchmark
 from evalscope.constants import Tags
+from evalscope.utils.import_utils import check_import
 from evalscope.utils.logger import get_logger
 
 if TYPE_CHECKING:
@@ -76,12 +77,11 @@ Needle in a Haystack is a benchmark focused on evaluating information retrieval 
                 'value': 'What is the best thing to do in San Francisco?'
             },
             'needles': {
-                'type':
-                'list[str]',
-                'description':
-                'List of factual needle strings inserted into the context.',
-                'value':
-                ['\nThe best thing to do in San Francisco is eat a sandwich and sit in Dolores Park on a sunny day.\n']
+                'type': 'list[str]',
+                'description': 'List of factual needle strings inserted into the context.',
+                'value': [
+                    '\nThe best thing to do in San Francisco is eat a sandwich and sit in Dolores Park on a sunny day.\n'
+                ]
             },
             'context_lengths_min': {
                 'type': 'int',
@@ -130,6 +130,12 @@ class NeedleHaystackAdapter(DefaultDataAdapter):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        check_import(
+            module_name=['matplotlib', 'seaborn'],
+            extra='needle_haystack',
+            raise_error=True,
+            feature_name=self.pretty_name
+        )
 
         self._use_llm_judge = True
         self.add_aggregation_name = False  # Don't add aggregation name for needle haystack adapter

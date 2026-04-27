@@ -4,8 +4,9 @@ import glob
 import os
 import pandas as pd
 from tabulate import tabulate
-from typing import Dict, List, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union
 
+from evalscope.api.model.perf_metrics import PerfSummary
 from evalscope.constants import DataCollection
 from evalscope.report.report import Report, Subset
 from evalscope.utils.logger import get_logger
@@ -187,3 +188,64 @@ def percentage_weighted_average_from_subsets(
         total_score += subset.score * weight
 
     return Subset(name=new_name, score=total_score, num=total_count)
+
+
+def gen_perf_table(
+    reports_path_list: list[str] = None,
+    report_list: list[Report] = None,
+) -> Optional[str]:
+    """Generate a formatted performance metrics table from reports.
+
+    Extracts ``perf_metrics['summary']`` from each Report and builds a
+    per-model × per-dataset table.  Reports that carry no perf data are
+    silently skipped.
+
+    Args:
+        reports_path_list (list[str], optional): List of directory paths to
+            search for report JSON files.  Either this or ``report_list``
+            must be provided.
+        report_list (list[Report], optional): List of Report objects.
+            Either this or ``reports_path_list`` must be provided.
+
+    Returns:
+        str: A simple-formatted table string, or ``None`` when no report
+        contains perf data.
+
+    Raises:
+        AssertionError: If neither argument is provided.
+    """
+    assert (reports_path_list is not None) or (report_list is not None), \
+        'Either reports_path_list or report_list must be provided.'
+
+    if report_list is None:
+        report_list = get_report_list(reports_path_list)
+
+    rows = []
+    for report in report_list:
+        perf = report.perf_metrics
+        if not perf:
+            continue
+        summary = perf.get('summary', {})
+        if not summary:
+            continue
+
+        ps = PerfSummary.from_dict(summary)
+
+        row = {
+            'Model': report.model_name,
+            'Dataset': report.dataset_name,
+            'Num': ps.n_samples,
+            'Avg Lat\n(s)': round(ps.avg_latency, 4),
+            'Avg TTFT\n(s)': round(ps.avg_ttft, 4) if ps.avg_ttft is not None else '-',
+            'Avg TPOT\n(s)': round(ps.avg_tpot, 4) if ps.avg_tpot is not None else '-',
+            'Avg Thpt\n(tok/s)': ps.avg_output_tps,
+            'Avg In\nTok': ps.avg_input_tokens,
+            'Avg Out\nTok': ps.avg_output_tokens,
+        }
+        rows.append(row)
+
+    if not rows:
+        return None
+
+    df = pd.DataFrame(rows)
+    return tabulate(df, headers=df.columns, tablefmt='simple', showindex=False)

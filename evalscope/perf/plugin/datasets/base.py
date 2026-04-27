@@ -3,6 +3,7 @@ from abc import abstractmethod
 from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
 
 from evalscope.perf.arguments import Arguments
+from evalscope.perf.plugin.datasets.utils import tokenize_chat_messages
 
 
 class DatasetPluginBase:
@@ -93,14 +94,25 @@ class DatasetPluginBase:
     def check_prompt_length(self, prompt: str) -> Tuple[bool, int]:
         """Check if the prompt length is within the specified range.
 
+        When a tokenizer is available and apply_chat_template is enabled the prompt is
+        wrapped in a chat message and the chat template is applied before counting tokens.
+        This makes the client-side length measurement consistent with the token count
+        that the server will report in usage.prompt_tokens (which includes the chat
+        template overhead), and avoids filtering prompts that appear to be within range
+        but actually exceed the target after the template is applied.
+
         Args:
             prompt (str): The input prompt string.
 
         Returns:
-            Tuple[bool, int]: A tuple containing a boolean indicating whether the prompt is valid and its length.
+            Tuple[bool, int]: A tuple containing a boolean indicating whether the prompt is
+                valid and its token/character length.
         """
         if self.tokenizer is None:
             prompt_length = len(prompt)
+        elif self.query_parameters.apply_chat_template:
+            messages = [self.create_message(prompt)]
+            prompt_length = len(tokenize_chat_messages(self.tokenizer, messages))
         else:
             prompt_length = len(self.tokenizer.encode(prompt))
         is_valid = self.query_parameters.min_prompt_length <= prompt_length <= self.query_parameters.max_prompt_length

@@ -4,7 +4,6 @@ import numpy as np
 import pandas as pd
 import re
 from collections import defaultdict
-from sklearn.linear_model import LogisticRegression
 from tqdm import tqdm
 
 from evalscope.api.evaluator import ReviewResult
@@ -34,8 +33,8 @@ def process_review_item(review_result: ReviewResult) -> list:
         'Index': str(review_result.index),
         'Input': review_result.input,
         'Question': review_result.input,  # Use input as question
-        'Generated':
-        prediction if prediction != extracted_prediction else extracted_prediction or '',  # Ensure no None value
+        'Generated': prediction
+        if prediction != extracted_prediction else extracted_prediction or '',  # Ensure no None value
         'Gold': target,
         'Pred': extracted_prediction,
         'Score': sample_score.score.model_dump(exclude_none=True),
@@ -174,6 +173,7 @@ def compute_mle_elo(df, scale=400, base=10, init_rating=1000, baseline_model='gp
             elo_scores[df['model_b'].iloc[0]] += scale  # Boost the winning model
         return elo_scores.sort_values(ascending=False)
 
+    from sklearn.linear_model import LogisticRegression
     lr = LogisticRegression(
         fit_intercept=False, penalty=None, tol=1e-8
     )  # May need to set a small value when not use GPT4 as judge model
